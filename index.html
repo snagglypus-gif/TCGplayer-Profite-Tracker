@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DnA Profit Scanner</title>
+  <title>TCGplayer Profit Tracker</title>
   <style>
     :root {
       color-scheme: dark;
@@ -274,12 +274,50 @@
         padding: 18px 16px;
       }
     }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .result-box {
+      background: rgba(255,255,255,0.04);
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .result-box .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    .result-box .value {
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: white;
+      font-weight: 700;
+      transition: all 0.2s ease;
+      box-shadow: 0 8px 20px rgba(34, 197, 94, 0.25);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 25px rgba(34, 197, 94, 0.4);
+    }
   </style>
 </head>
 <body>
   <main class="container" role="main">
-    <h1>DnA Profit Scanner</h1>
-    <p class="lead">Quickly estimate resale profit on sealed trading card products with fees, shipping, and ROI.</p>
+    <h1>TCGplayer Profit Tracker</h1>
+    <p class="lead">Track real profit, fees, shipping, ROI, inventory, and budget for TCGplayer sales.</p>
 
     <div class="grid">
       <div class="field">
@@ -288,9 +326,16 @@
       </div>
 
       <div class="field">
+        <label for="cardNumberInput">Card Number Optional</label>
+        <input id="cardNumberInput" type="text" placeholder="Example: 054/091 or 199/165" autocomplete="off" />
+      </div>
+
+      <div class="field">
         <label for="marketPriceInput">Market Price</label>
         <input id="marketPriceInput" type="number" placeholder="Enter market price" min="0" step="0.01" />
       </div>
+
+      <div id="cardResults" class="inventory-list"></div>
 
       <div class="field">
         <label for="purchasePrice">Purchase Price</label>
@@ -302,36 +347,54 @@
         <select id="shippingMethod">
           <option value="1">PWE ($1)</option>
           <option value="4">Bubble Mailer ($4)</option>
+          <option value="custom">Custom Shipping</option>
         </select>
+      </div>
+
+      <div class="field" id="customShippingField" style="display: none;">
+        <label for="customShippingInput">Custom Shipping Cost</label>
+        <input id="customShippingInput" type="number" placeholder="Enter shipping cost" min="0" step="0.01" />
       </div>
 
       <button id="calculateButton" type="button" onclick="calculateProfit()">Calculate Profit</button>
       <button id="saveButton" type="button" disabled onclick="saveToInventory()">Save to Inventory</button>
     </div>
 
-    <section class="result-panel" id="resultPanel" aria-live="polite">
-      <div class="result-row">
-        <div class="result-label">Total Fees</div>
-        <div class="result-value" id="totalFeesValue">-</div>
+    <section class="result-panel" id="resultPanel">
+
+      <div class="result-grid">
+
+        <div class="result-box">
+          <div class="label">Profit</div>
+          <div class="value" id="netProfitValue">$0.00</div>
+        </div>
+
+        <div class="result-box">
+          <div class="label">ROI</div>
+          <div class="value" id="roiValue">0%</div>
+        </div>
+
+        <div class="result-box">
+          <div class="label">Max Buy</div>
+          <div class="value" id="maxBuyPriceValue">$0.00</div>
+        </div>
+
+        <div class="result-box">
+          <div class="label">Shipping</div>
+          <div class="value" id="shippingValue">$0.00</div>
+        </div>
+
+        <div class="result-box">
+          <div class="label">Fees</div>
+          <div class="value" id="totalFeesValue">$0.00</div>
+        </div>
+
       </div>
-      <div class="result-row">
-        <div class="result-label">Net Profit</div>
-        <div class="result-value" id="netProfitValue">-</div>
+
+      <div class="status pass" id="decisionStatus">
+        Enter values and calculate
       </div>
-      <div class="result-row">
-        <div class="result-label">Shipping</div>
-        <div class="result-value" id="shippingValue">-</div>
-      </div>
-      <div class="result-row">
-        <div class="result-label">Max Buy Price</div>
-        <div class="result-value" id="maxBuyPriceValue">-</div>
-      </div>
-      <div class="result-row">
-        <div class="result-label">ROI %</div>
-        <div class="result-value" id="roiValue">-</div>
-      </div>
-      <div class="status pass" id="decisionStatus">Enter values and calculate</div>
-      <p class="note">Fees include TCGplayer seller fee, transaction fee, shipping cost, supply cost, and purchase price.</p>
+
     </section>
 
     <section class="result-panel" id="inventoryPanel">
@@ -398,12 +461,16 @@
     };
 
     const productInput = document.getElementById('productName');
+    const cardNumberInput = document.getElementById('cardNumberInput');
     const marketPriceInput = document.getElementById('marketPriceInput');
     const purchaseInput = document.getElementById('purchasePrice');
     const shippingSelect = document.getElementById('shippingMethod');
+    const customShippingField = document.getElementById('customShippingField');
+    const customShippingInput = document.getElementById('customShippingInput');
     const calculateButton = document.getElementById('calculateButton');
     const saveButton = document.getElementById('saveButton');
     const inventoryList = document.getElementById('inventoryList');
+    const cardResults = document.getElementById('cardResults');
     const totalFeesValue = document.getElementById('totalFeesValue');
     const netProfitValue = document.getElementById('netProfitValue');
     const shippingValue = document.getElementById('shippingValue');
@@ -506,8 +573,13 @@
       inventoryList.innerHTML = inventory.map((item) => {
         return `
           <div class="inventory-item">
-            <div>${item.productName} (${item.shippingLabel})</div>
-            <div>${formatCurrency(item.netProfit)}</div>
+            <div>
+              <strong>${item.productName}</strong>
+              <div class="note">${item.shippingLabel}</div>
+            </div>
+            <div style="font-weight:700;">
+              ${formatCurrency(item.netProfit)}
+            </div>
           </div>
         `;
       }).join('');
@@ -531,8 +603,20 @@
       const productName = productInput.value;
       const marketPrice = parseFloat(marketPriceInput.value);
       const purchasePrice = parseFloat(purchaseInput.value);
-      const shippingCost = parseFloat(shippingSelect.value);
       const settings = getSettings();
+
+      let shippingCost;
+      if (shippingSelect.value === "custom") {
+        shippingCost = parseFloat(customShippingInput.value);
+        if (Number.isNaN(shippingCost) || shippingCost < 0) {
+          customShippingInput.focus();
+          alert("Enter a valid custom shipping cost");
+          updateSaveState(false);
+          return;
+        }
+      } else {
+        shippingCost = parseFloat(shippingSelect.value);
+      }
 
       if (Number.isNaN(marketPrice) || marketPrice < 0) {
         marketPriceInput.focus();
@@ -573,12 +657,20 @@
       roiValue.textContent = formatPercent(roi);
       updateDecisionLabel(netProfit, purchasePrice, maxBuyPrice);
 
+      if (netProfit > 5) {
+        netProfitValue.style.color = "#4ade80";
+      } else if (netProfit > 0) {
+        netProfitValue.style.color = "#facc15";
+      } else {
+        netProfitValue.style.color = "#f87171";
+      }
+
       lastCalculatedItem = {
         productName,
         marketPrice,
         purchasePrice,
         shippingCost,
-        shippingLabel: shippingSelect.options[shippingSelect.selectedIndex].text,
+        shippingLabel: shippingSelect.value === "custom" ? `Custom ($${shippingCost.toFixed(2)})` : shippingSelect.options[shippingSelect.selectedIndex].text,
         totalFees,
         netProfit,
         maxBuyPrice: Math.max(0, maxBuyPrice),
@@ -590,12 +682,96 @@
 
     // calculateButton.addEventListener('click', calculateProfit);
 
-    productInput.addEventListener('input', () => {
-      const marketPrice = getMarketPrice(productInput.value);
-      if (marketPrice !== null) {
-        marketPriceInput.value = marketPrice;
+    async function fetchPokemonCards() {
+      const name = productInput.value.trim();
+      const cardNumber = cardNumberInput.value.trim();
+
+      if (name.length < 3) return;
+
+      cardResults.innerHTML = "<p class='note'>Searching...</p>";
+
+      try {
+        let query = `name:"${name}" supertype:Pokémon`;
+
+        if (cardNumber.length > 0) {
+          const cleanNumber = cardNumber.includes("/")
+            ? cardNumber.split("/")[0]
+            : cardNumber;
+
+          query += ` number:${cleanNumber}`;
+        }
+
+        const response = await fetch(
+          `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=10`
+        );
+
+        const data = await response.json();
+
+        if (!data.data || data.data.length === 0) {
+          cardResults.innerHTML = '<p class="note">No matching cards found.</p>';
+          return;
+        }
+
+        renderCardResults(data.data);
+
+      } catch (error) {
+        console.error(error);
+        cardResults.innerHTML = '<p class="note">Error searching cards.</p>';
       }
-    });
+    }
+
+    function getBestCardPrice(card) {
+      return card.tcgplayer?.prices?.holofoil?.market ||
+             card.tcgplayer?.prices?.normal?.market ||
+             card.tcgplayer?.prices?.reverseHolofoil?.market ||
+             null;
+    }
+
+    function renderCardResults(cards) {
+      cardResults.innerHTML = cards.map((card, index) => {
+        const price = getBestCardPrice(card);
+
+        if (!price) return "";
+
+        const image = card.images?.small || "";
+        const setName = card.set?.name || "Unknown set";
+        const number = card.number || "?";
+
+        return `
+          <button type="button" onclick="selectCardResult(${index})" class="inventory-item" style="text-align:left;">
+            <div style="display:flex; gap:12px; align-items:center;">
+              ${image ? `<img src="${image}" alt="${card.name}" style="width:42px;border-radius:6px;">` : ""}
+              <div>
+                <div><strong>${card.name}</strong></div>
+                <div class="note" style="margin:4px 0 0;">${setName} • #${number}</div>
+                <div class="note" style="margin:4px 0 0;">Market: ${formatCurrency(price)}</div>
+              </div>
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      window.currentCardResults = cards;
+    }
+
+    function selectCardResult(index) {
+      const card = window.currentCardResults[index];
+      const price = getBestCardPrice(card);
+
+      if (!card) return;
+
+      productInput.value = `${card.name} - ${card.set.name} #${card.number}`;
+
+      if (price) {
+        marketPriceInput.value = price.toFixed(2);
+      }
+
+      cardResults.innerHTML = "";
+
+      if (marketPriceInput.value !== "" && purchaseInput.value !== "") {
+        calculateProfit();
+      }
+    }
 
     function saveToInventory() {
       if (!lastCalculatedItem) {
@@ -610,18 +786,18 @@
       }, 1200);
       // Auto-clear inputs
       productInput.value = "";
+      cardNumberInput.value = "";
       marketPriceInput.value = "";
       purchaseInput.value = "";
+      customShippingInput.value = "";
+      cardResults.innerHTML = "";
     }
 
     // Recalculate on settings change if there's a last item
     [tcgFeeRateInput, transactionFeeInput, supplyCostInput, minProfitThresholdInput, budgetInput].forEach(input => {
       input.addEventListener('input', () => {
         saveSettings();
-        if (lastCalculatedItem) {
-          calculateProfit();
-        }
-        renderInventory(); // Update remaining budget
+        renderInventory();
       });
     });
 
@@ -638,6 +814,32 @@
     });
 
     productInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        calculateProfit();
+      }
+    });
+
+    let timeout;
+
+    [productInput, cardNumberInput].forEach(input => {
+      input.addEventListener('input', () => {
+        clearTimeout(timeout);
+
+        timeout = setTimeout(() => {
+          fetchPokemonCards();
+        }, 900);
+      });
+    });
+
+    shippingSelect.addEventListener('change', () => {
+      customShippingField.style.display =
+        shippingSelect.value === "custom" ? "grid" : "none";
+      if (lastCalculatedItem) {
+        calculateProfit();
+      }
+    });
+
+    customShippingInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         calculateProfit();
       }
